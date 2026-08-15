@@ -1,0 +1,56 @@
+# ============================================================
+# Казань Навигатор 4.0 — Docker Compose
+# ============================================================
+# Запуск:    docker compose up -d
+# Логи:      docker compose logs -f
+# Остановка: docker compose down
+# Сборка:    docker compose build
+# ============================================================
+
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: kazan-navigator
+    ports:
+      - "5000:5000"
+    volumes:
+      # Монтируем данные (чтобы не пересобирать образ при обновлении OSM)
+      - ./static/data:/app/static/data
+      # Монтируем SQLite базы (избранное, история)
+      - ./data:/app/data
+    environment:
+      - FLASK_ENV=production
+      - PORT=5000
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - kazan-net
+
+  # Опционально: Redis для кэширования (когда нагрузка вырастет)
+  redis:
+    image: redis:7-alpine
+    container_name: kazan-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - kazan-net
+    profiles:
+      - with-redis
+
+networks:
+  kazan-net:
+    driver: bridge
+
+volumes:
+  redis-data:
